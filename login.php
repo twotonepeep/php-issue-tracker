@@ -1,6 +1,14 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Issue Tracker</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
 <?php
-require '../app/db.php';
-require '../app/auth.php';
+require_once __DIR__ . '/../app/auth.php';
+require_once __DIR__ . '/../app/db.php';
 
 $error = "";
 
@@ -22,11 +30,17 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
 }
 ?>
 
-<h2>Login</h2>
+<div class="container">
 
-<form method="POST">
-    <p style="color:red;"><?php echo $error; ?></p>
-    <input name="email" placeholder="Email" required><br>
-    <input type="password" name="password" placeholder="Password" required><br>
-    <button>Login</button>
-</form>
+    <h2>Login</h2>
+
+    <form method="POST">
+        <input name="email">
+        <input type="password" name="password">
+        <button>Login</button>
+    </form>
+
+</div>
+
+</body>
+</html>

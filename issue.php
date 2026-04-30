@@ -1,3 +1,11 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Issue Tracker</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
 <?php
 require_once __DIR__ . '/../app/auth.php';
 require_once __DIR__ . '/../app/db.php';
@@ -77,6 +85,15 @@ $stmt->execute([$issue_id]);
 $comments = $stmt->fetchAll();
 ?>
 
+<div class="container">
+
+    <h2>Issue Title</h2>
+
+    <!-- description -->
+    <!-- comments -->
+    <!-- forms -->
+
+
 <h2><?php echo htmlspecialchars($issue["title"]); ?></h2>
 
 <p><strong>Status:</strong> <?php echo $issue["status"]; ?></p>
@@ -110,6 +127,7 @@ $comments = $stmt->fetchAll();
         <select name="status">
             <option>Open</option>
             <option>In Progress</option>
+            <option>Awaiting User</option>
             <option>Resolved</option>
             <option>Closed</option>
         </select>
@@ -131,3 +149,8 @@ $comments = $stmt->fetchAll();
 
 <br>
 <a href="issues.php">Back to Issues</a>
+
+<p><strong>Category:</strong> <?php echo $issue["category"]; ?></p>
+</div>
+</body>
+</html>
