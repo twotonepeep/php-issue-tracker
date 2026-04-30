@@ -1,13 +1,55 @@
 <?php
-require_once '../app/db.php';
-require_once '../app/auth.php';
+require_once __DIR__ . '/../app/auth.php';
+require_once __DIR__ . '/../app/db.php';
 requireLogin();
 
+// Get issue ID FIRST
 if (!isset($_GET['id'])) {
-    die("No issue ID provided.");
+    header("Location: issues.php");
+    exit();
 }
 
 $issue_id = $_GET['id'];
+
+// Handle POST requests
+if ($_SERVER["REQUEST_METHOD"] == "POST") {
+
+    // CSRF protection
+    if (!verifyCSRFToken($_POST['csrf'] ?? '')) {
+        die("Invalid CSRF token");
+    }
+
+    // Admin status update
+    if (isset($_POST['status']) && $_SESSION["user"]["role"] === 'admin') {
+
+        $stmt = $pdo->prepare("UPDATE issues SET status = ? WHERE id = ?");
+        $stmt->execute([$_POST['status'], $issue_id]);
+
+        header("Location: issue.php?id=" . $issue_id);
+        exit();
+    }
+
+    // Add comment
+    if (isset($_POST['comment'])) {
+
+        $comment = trim($_POST["comment"]);
+
+        if ($comment !== "") {
+            $stmt = $pdo->prepare("
+                INSERT INTO comments (issue_id, user_id, comment)
+                VALUES (?, ?, ?)
+            ");
+            $stmt->execute([
+                    $issue_id,
+                    $_SESSION["user"]["id"],
+                    $comment
+            ]);
+
+            header("Location: issue.php?id=" . $issue_id);
+            exit();
+        }
+    }
+}
 
 // Get issue
 $stmt = $pdo->prepare("
@@ -33,26 +75,6 @@ $stmt = $pdo->prepare("
 ");
 $stmt->execute([$issue_id]);
 $comments = $stmt->fetchAll();
-
-// Add comment
-if ($_SERVER["REQUEST_METHOD"] == "POST") {
-    $comment = trim($_POST["comment"]);
-
-    if ($comment !== "") {
-        $stmt = $pdo->prepare("
-            INSERT INTO comments (issue_id, user_id, comment)
-            VALUES (?, ?, ?)
-        ");
-        $stmt->execute([
-            $issue_id,
-            $_SESSION["user"]["id"],
-            $comment
-        ]);
-
-        header("Location: issue.php?id=" . $issue_id);
-        exit();
-    }
-}
 ?>
 
 <h2><?php echo htmlspecialchars($issue["title"]); ?></h2>
@@ -79,9 +101,30 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
 
 <hr>
 
+<!-- Admin status update -->
+<?php if ($_SESSION["user"]["role"] === 'admin'): ?>
+    <h3>Update Status</h3>
+    <form method="POST">
+        <input type="hidden" name="csrf" value="<?php echo generateCSRFToken(); ?>">
+
+        <select name="status">
+            <option>Open</option>
+            <option>In Progress</option>
+            <option>Resolved</option>
+            <option>Closed</option>
+        </select>
+
+        <button>Update Status</button>
+    </form>
+<?php endif; ?>
+
+<hr>
+
 <h3>Add Comment</h3>
 
 <form method="POST">
+    <input type="hidden" name="csrf" value="<?php echo generateCSRFToken(); ?>">
+
     <textarea name="comment" required></textarea><br><br>
     <button>Add Comment</button>
 </form>
