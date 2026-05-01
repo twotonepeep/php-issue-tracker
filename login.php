@@ -1,46 +1,88 @@
-<!DOCTYPE html>
-<html>
-<head>
-    <title>Issue Tracker</title>
-    <link rel="stylesheet" href="style.css">
-</head>
-<body>
-
 <?php
 require_once __DIR__ . '/../app/auth.php';
 require_once __DIR__ . '/../app/db.php';
 
-$error = "";
+/**
+ * =========================
+ * HANDLE LOGIN REQUEST
+ * =========================
+ */
+if ($_SERVER["REQUEST_METHOD"] === "POST") {
 
-if ($_SERVER["REQUEST_METHOD"] == "POST") {
-    $email = $_POST["email"];
-    $password = $_POST["password"];
+    // Sanitize inputs
+    $email = trim($_POST["email"] ?? "");
+    $password = $_POST["password"] ?? "";
 
+    /**
+     * =========================
+     * BASIC VALIDATION
+     * =========================
+     */
+    if ($email === "" || $password === "") {
+        header("Location: index.php?error=1");
+        exit();
+    }
+
+    /**
+     * =========================
+     * FETCH USER
+     * =========================
+     */
     $stmt = $pdo->prepare("SELECT * FROM users WHERE email = ?");
     $stmt->execute([$email]);
-    $user = $stmt->fetch();
 
+    $user = $stmt->fetch(PDO::FETCH_ASSOC);
+
+    /**
+     * =========================
+     * VERIFY PASSWORD
+     * =========================
+     */
     if ($user && password_verify($password, $user["password_hash"])) {
-        $_SESSION["user"] = $user;
+
+        /**
+         * =========================
+         * ACCOUNT STATUS CHECK
+         * =========================
+         */
+        if ($user["status"] !== "active") {
+            header("Location: index.php?error=notapproved");
+            exit();
+        }
+
+        /**
+         * =========================
+         * SESSION SECURITY
+         * =========================
+         * Prevent session fixation
+         */
+        regenerateSession();
+
+        /**
+         * =========================
+         * STORE USER SESSION
+         * =========================
+         */
+        $_SESSION["user"] = [
+            "id"   => $user["id"],
+            "name" => $user["name"],
+            "role" => $user["role"]
+        ];
+
+        /**
+         * =========================
+         * REDIRECT TO DASHBOARD
+         * =========================
+         */
         header("Location: issues.php");
         exit();
-    } else {
-        $error = "Invalid login";
     }
+
+    /**
+     * =========================
+     * INVALID LOGIN
+     * =========================
+     */
+    header("Location: index.php?error=1");
+    exit();
 }
-?>
-
-<div class="container">
-
-    <h2>Login</h2>
-
-    <form method="POST">
-        <input name="email">
-        <input type="password" name="password">
-        <button>Login</button>
-    </form>
-
-</div>
-
-</body>
-</html>

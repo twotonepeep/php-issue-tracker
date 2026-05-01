@@ -1,34 +1,38 @@
-<!DOCTYPE html>
-<html>
-<head>
-    <title>Issue Tracker</title>
-    <link rel="stylesheet" href="style.css">
-</head>
-<body>
-
+<?php
+$pageTitle = "Issue Description"; // change per page
+include 'header.php';
+?>
 <?php
 require_once __DIR__ . '/../app/auth.php';
 require_once __DIR__ . '/../app/db.php';
+
 requireLogin();
 
-// Get issue ID FIRST
-if (!isset($_GET['id'])) {
+/**
+ * =========================
+ * VALIDATE ISSUE ID
+ * =========================
+ */
+if (!isset($_GET['id']) || !is_numeric($_GET['id'])) {
     header("Location: issues.php");
     exit();
 }
 
 $issue_id = $_GET['id'];
 
-// Handle POST requests
-if ($_SERVER["REQUEST_METHOD"] == "POST") {
+/**
+ * =========================
+ * HANDLE FORM ACTIONS
+ * =========================
+ */
+if ($_SERVER["REQUEST_METHOD"] === "POST") {
 
-    // CSRF protection
     if (!verifyCSRFToken($_POST['csrf'] ?? '')) {
         die("Invalid CSRF token");
     }
 
-    // Admin status update
-    if (isset($_POST['status']) && $_SESSION["user"]["role"] === 'admin') {
+    /* STATUS UPDATE (ADMIN + TECH ONLY) */
+    if (isset($_POST['status']) && in_array($_SESSION["user"]["role"], ["admin", "technical"])) {
 
         $stmt = $pdo->prepare("UPDATE issues SET status = ? WHERE id = ?");
         $stmt->execute([$_POST['status'], $issue_id]);
@@ -37,10 +41,10 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
         exit();
     }
 
-    // Add comment
+    /* ADD COMMENT */
     if (isset($_POST['comment'])) {
 
-        $comment = trim($_POST["comment"]);
+        $comment = trim($_POST['comment']);
 
         if ($comment !== "") {
             $stmt = $pdo->prepare("
@@ -52,14 +56,18 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                     $_SESSION["user"]["id"],
                     $comment
             ]);
-
-            header("Location: issue.php?id=" . $issue_id);
-            exit();
         }
+
+        header("Location: issue.php?id=" . $issue_id);
+        exit();
     }
 }
 
-// Get issue
+/**
+ * =========================
+ * FETCH ISSUE
+ * =========================
+ */
 $stmt = $pdo->prepare("
     SELECT issues.*, users.name AS creator
     FROM issues
@@ -73,7 +81,11 @@ if (!$issue) {
     die("Issue not found.");
 }
 
-// Get comments
+/**
+ * =========================
+ * FETCH COMMENTS
+ * =========================
+ */
 $stmt = $pdo->prepare("
     SELECT comments.*, users.name
     FROM comments
@@ -83,74 +95,101 @@ $stmt = $pdo->prepare("
 ");
 $stmt->execute([$issue_id]);
 $comments = $stmt->fetchAll();
+
+$csrf = generateCSRFToken();
 ?>
+
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Issue Detail</title>
+    <link rel="stylesheet" href="style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;600&family=Nunito:wght@300;400;600&display=swap" rel="stylesheet">
+</head>
+<body>
 
 <div class="container">
 
-    <h2>Issue Title</h2>
+    <!-- HEADER -->
+    <div class="top-bar">
 
-    <!-- description -->
-    <!-- comments -->
-    <!-- forms -->
+        <div class="left">
+            <a href="issues.php">← Back</a> |
+            <a href="logout.php">Logout</a>
+        </div>
 
+        <div class="center">
+            <img src="assets/logo.png" class="logo" alt="Logo">
+        </div>
 
-<h2><?php echo htmlspecialchars($issue["title"]); ?></h2>
+        <div class="right"></div>
 
-<p><strong>Status:</strong> <?php echo $issue["status"]; ?></p>
-<p><strong>Priority:</strong> <?php echo $issue["priority"]; ?></p>
-<p><strong>Created by:</strong> <?php echo $issue["creator"]; ?></p>
+    </div>
 
-<hr>
+    <h2><?= htmlspecialchars($issue["title"]) ?></h2>
 
-<h3>Description</h3>
-<p><?php echo nl2br(htmlspecialchars($issue["description"])); ?></p>
+    <!-- ISSUE DETAILS -->
+    <div class="panel">
+        <p><strong>Status:</strong> <?= htmlspecialchars($issue["status"]) ?></p>
+        <p><strong>Priority:</strong> <?= htmlspecialchars($issue["priority"]) ?></p>
+        <p><strong>Category:</strong> <?= htmlspecialchars($issue["category"]) ?></p>
+        <p><strong>Created by:</strong> <?= htmlspecialchars($issue["creator"]) ?></p>
+    </div>
 
-<hr>
+    <!-- DESCRIPTION -->
+    <div class="panel">
+        <h3>Description</h3>
+        <p><?= htmlspecialchars($issue["description"]) ?></p>
+    </div>
 
-<h3>Comments</h3>
+    <!-- COMMENTS -->
+    <div class="panel">
+        <h3>Comments</h3>
 
-<?php foreach ($comments as $c): ?>
-    <p>
-        <strong><?php echo $c["name"]; ?>:</strong>
-        <?php echo htmlspecialchars($c["comment"]); ?>
-    </p>
-<?php endforeach; ?>
+        <?php foreach ($comments as $c): ?>
+            <p>
+                <strong><?= htmlspecialchars($c["name"]) ?>:</strong>
+                <?= htmlspecialchars($c["comment"]) ?>
+            </p>
+        <?php endforeach; ?>
+    </div>
 
-<hr>
+    <!-- STATUS UPDATE -->
+    <?php if (in_array($_SESSION["user"]["role"], ["admin", "technical"])): ?>
+        <div class="panel">
+            <h3>Update Status</h3>
 
-<!-- Admin status update -->
-<?php if ($_SESSION["user"]["role"] === 'admin'): ?>
-    <h3>Update Status</h3>
-    <form method="POST">
-        <input type="hidden" name="csrf" value="<?php echo generateCSRFToken(); ?>">
+            <form method="POST">
+                <input type="hidden" name="csrf" value="<?= $csrf ?>">
 
-        <select name="status">
-            <option>Open</option>
-            <option>In Progress</option>
-            <option>Awaiting User</option>
-            <option>Resolved</option>
-            <option>Closed</option>
-        </select>
+                <select name="status" class="form-control">
+                    <option value="Open">Open</option>
+                    <option value="In Progress">In Progress</option>
+                    <option value="Resolved">Resolved</option>
+                    <option value="Closed">Closed</option>
+                </select>
 
-        <button>Update Status</button>
-    </form>
-<?php endif; ?>
+                <button class="btn">Update</button>
+            </form>
+        </div>
+    <?php endif; ?>
 
-<hr>
+    <!-- ADD COMMENT -->
+    <div class="panel">
+        <h3>Add Comment</h3>
 
-<h3>Add Comment</h3>
+        <form method="POST">
+            <input type="hidden" name="csrf" value="<?= $csrf ?>">
 
-<form method="POST">
-    <input type="hidden" name="csrf" value="<?php echo generateCSRFToken(); ?>">
+            <textarea name="comment" class="form-control" placeholder="Write a comment..."></textarea>
 
-    <textarea name="comment" required></textarea><br><br>
-    <button>Add Comment</button>
-</form>
+            <button class="btn">Add Comment</button>
+        </form>
+    </div>
 
-<br>
-<a href="issues.php">Back to Issues</a>
-
-<p><strong>Category:</strong> <?php echo $issue["category"]; ?></p>
 </div>
+
+<?php include 'footer.php'; ?>
+
 </body>
 </html>
